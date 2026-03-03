@@ -19,7 +19,7 @@ glob = "0.3"
 humantime = "2.1"
 indicatif = "0.18.3"
 llama-cpp-2 = "0.1"
-regex = "1.11"
+regex = "1.12"
 reqwest = { version = "0.13.1", features = ["blocking"] }
 rusqlite = { version = "0.38.0", features = ["bundled", "functions"] }
 serde = { version = "1.0", features = ["derive"] }

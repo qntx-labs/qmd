@@ -23,7 +23,7 @@ serde_yml = "0.0.12"
 sha2 = "0.10"
 sqlite-vec = "0.1"
 thiserror = "2.0"
-zerocopy = "0.8.47"
+zerocopy = "0.8.48"
 
 [profile.release]
 codegen-units = 1

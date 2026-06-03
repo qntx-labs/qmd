@@ -13,7 +13,7 @@ repository = "https://github.com/qntx/qmd"
 qmd = { version = "0.5", path = "qmd" }
 
 clap = { version = "4.6.0", features = ["derive"] }
-fastembed = "5.13"
+fastembed = "5.15"
 ignore = "0.4"
 regex = "1.12.3"
 rusqlite = { version = "0.39", features = ["bundled", "functions"] }

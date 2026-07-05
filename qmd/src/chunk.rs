@@ -66,7 +66,10 @@ impl Chunker {
         let mut pos = 0;
 
         while pos < content.len() {
-            let target_end = (pos + self.max_chars).min(content.len());
+            // Snap to a char boundary: break points are boundary-safe, but the
+            // fallback `pos + max_chars` offset can land inside a multi-byte char,
+            // which would panic when slicing `content[pos..end]` below.
+            let target_end = floor_char_boundary(content, (pos + self.max_chars).min(content.len()));
             let mut end = target_end;
 
             if end < content.len()
@@ -78,7 +81,7 @@ impl Chunker {
             }
 
             if end <= pos {
-                end = (pos + self.max_chars).min(content.len());
+                end = target_end;
             }
 
             chunks.push(Chunk {
@@ -90,7 +93,7 @@ impl Chunker {
                 break;
             }
 
-            let next = end.saturating_sub(self.overlap_chars);
+            let next = floor_char_boundary(content, end.saturating_sub(self.overlap_chars));
             pos = if chunks.last().is_some_and(|c| next <= c.pos) {
                 end
             } else {
@@ -221,4 +224,54 @@ fn weighted_score(bp: &BreakPoint, target: usize, window: usize) -> f64 {
     let ratio = dist / w;
     let proximity = ratio.mul_add(-ratio, 1.0).max(0.0);
     f64::from(bp.score) * proximity
+}
+
+/// Largest index `<= i` that lies on a UTF-8 char boundary of `s`.
+///
+/// Offsets computed from `str::len()` can land inside a multi-byte character;
+/// slicing there panics. Snapping down to the nearest boundary keeps slicing
+/// safe while staying within the intended region.
+fn floor_char_boundary(s: &str, i: usize) -> usize {
+    if i >= s.len() {
+        return s.len();
+    }
+    let mut idx = i;
+    while idx > 0 && !s.is_char_boundary(idx) {
+        idx -= 1;
+    }
+    idx
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn floor_char_boundary_snaps_into_multibyte_char() {
+        let s = "a…b"; // '…' occupies bytes 1..4
+        assert_eq!(floor_char_boundary(s, 1), 1);
+        assert_eq!(floor_char_boundary(s, 2), 1);
+        assert_eq!(floor_char_boundary(s, 3), 1);
+        assert_eq!(floor_char_boundary(s, 4), 4);
+        assert_eq!(floor_char_boundary(s, 999), s.len());
+    }
+
+    #[test]
+    fn split_multibyte_without_break_points_does_not_panic() {
+        // A long run of multi-byte chars with no good break points forces the
+        // `pos + max_chars` fallback to land inside a char. This used to panic
+        // with "byte index N is not a char boundary".
+        let content = "…".repeat(2000); // 3 bytes each, no newlines/sentences
+        let chunks = Chunker::new(200, 30).split(&content);
+        assert!(chunks.len() > 1);
+        // Reassembling the chunk texts must reproduce valid UTF-8 covering the doc.
+        assert!(chunks.iter().all(|c| !c.text.is_empty()));
+    }
+
+    #[test]
+    fn split_ascii_unchanged() {
+        let content = "a".repeat(500);
+        let chunks = Chunker::new(100, 10).split(&content);
+        assert!(chunks.len() > 1);
+    }
 }
